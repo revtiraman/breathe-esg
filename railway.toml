@@ -1,8 +1,8 @@
 [build]
-builder = "nixpacks"
-buildCommand = "cd frontend && npm install && npm run build && cp -r dist ../backend/staticfiles_src && cd ../backend && pip install -r requirements.txt && python manage.py collectstatic --noinput && python manage.py migrate && python manage.py seed_demo"
+builder = "dockerfile"
+dockerfilePath = "Dockerfile"
 
 [deploy]
-startCommand = "cd backend && gunicorn breathe.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --timeout 60"
 healthcheckPath = "/api/auth/me/"
 restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 10

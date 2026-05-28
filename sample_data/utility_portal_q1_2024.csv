@@ -1,0 +1,13 @@
+Account Number,Meter Number,Service Address,Billing Period Start,Billing Period End,Usage (kWh),Demand (kW),Rate Schedule,Total Charges
+ACC-10021,MTR-A4421,Frankfurt HQ - Building A,2024-01-18,2024-02-14,48200,220,B-10 Large Commercial,9640.00
+ACC-10021,MTR-A4422,Frankfurt HQ - Building B,2024-01-18,2024-02-14,31500,145,B-10 Large Commercial,6300.00
+ACC-10022,MTR-B1130,Munich Office,2024-01-22,2024-02-19,18750,88,C-20 Commercial,3562.50
+ACC-10023,MTR-C5501,Berlin Data Center,2024-01-15,2024-02-12,124800,580,D-30 High Demand,31200.00
+ACC-10021,MTR-A4421,Frankfurt HQ - Building A,2024-02-15,2024-03-14,52100,235,B-10 Large Commercial,10420.00
+ACC-10021,MTR-A4422,Frankfurt HQ - Building B,2024-02-15,2024-03-14,33200,152,B-10 Large Commercial,6640.00
+ACC-10022,MTR-B1130,Munich Office,2024-02-20,2024-03-19,17400,82,C-20 Commercial,3306.00
+ACC-10023,MTR-C5501,Berlin Data Center,2024-02-13,2024-03-12,131200,595,D-30 High Demand,32800.00
+ACC-10024,MTR-D0012,Hamburg Warehouse,2024-01-25,2024-02-23,9800,45,A-5 Small Commercial,1960.00
+ACC-10024,MTR-D0012,Hamburg Warehouse,2024-02-24,2024-03-24,10200,48,A-5 Small Commercial,2040.00
+ACC-10023,MTR-C5501,Berlin Data Center,2024-03-13,2024-04-11,128600,588,D-30 High Demand,32150.00
+ACC-10021,MTR-A4421,Frankfurt HQ - Building A,2024-03-15,2024-04-14,49800,228,B-10 Large Commercial,9960.00

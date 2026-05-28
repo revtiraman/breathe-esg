@@ -1,0 +1,18 @@
+Trip ID,Traveler Name,Traveler Email,Booking Date,Travel Date,Return Date,Type,Origin,Destination,Origin Code,Destination Code,Distance (km),Class of Service,Hotel Name,City,Nights,Cost,Cost Center,Purpose
+TRP-2024-001,Sarah Mueller,s.mueller@acmecorp.com,2024-01-10,2024-01-15,2024-01-18,AIR,Frankfurt,New York,FRA,JFK,,ECONOMY,,,0,1240.00,CC-SALES,Client Meeting
+TRP-2024-001,Sarah Mueller,s.mueller@acmecorp.com,2024-01-10,2024-01-15,2024-01-18,HOTEL,,,,,,,The Westin New York,New York,3,720.00,CC-SALES,Client Meeting
+TRP-2024-002,James Thornton,j.thornton@acmecorp.com,2024-01-12,2024-01-20,2024-01-21,AIR,London,Munich,LHR,MUC,,BUSINESS,,,0,890.00,CC-MGMT,Board Meeting
+TRP-2024-003,Priya Sharma,p.sharma@acmecorp.com,2024-01-18,2024-01-25,2024-01-26,AIR,Frankfurt,Berlin,FRA,BER,550,ECONOMY,,,0,180.00,CC-ENG,Tech Conference
+TRP-2024-003,Priya Sharma,p.sharma@acmecorp.com,2024-01-18,2024-01-25,2024-01-26,HOTEL,,,,,,,Hotel Adlon,Berlin,1,280.00,CC-ENG,Tech Conference
+TRP-2024-004,Marcus Cole,m.cole@acmecorp.com,2024-01-22,2024-02-01,2024-02-05,AIR,New York,Singapore,JFK,SIN,,BUSINESS,,,0,4800.00,CC-SALES,APAC Sales Tour
+TRP-2024-004,Marcus Cole,m.cole@acmecorp.com,2024-01-22,2024-02-01,2024-02-05,HOTEL,,,,,,,Marriott Singapore,Singapore,4,1200.00,CC-SALES,APAC Sales Tour
+TRP-2024-004,Marcus Cole,m.cole@acmecorp.com,2024-01-22,2024-02-05,2024-02-08,AIR,Singapore,Tokyo,SIN,HND,,ECONOMY,,,0,620.00,CC-SALES,APAC Sales Tour
+TRP-2024-005,Elena Brandt,e.brandt@acmecorp.com,2024-02-05,2024-02-12,2024-02-12,TAXI,Frankfurt Airport,Frankfurt Office,,,,,,,,45.00,CC-MKTG,Trade Show
+TRP-2024-006,David Park,d.park@acmecorp.com,2024-02-08,2024-02-14,2024-02-15,AIR,Chicago,Los Angeles,ORD,LAX,,ECONOMY,,,0,340.00,CC-ENG,Sprint Planning
+TRP-2024-007,Sarah Mueller,s.mueller@acmecorp.com,2024-02-15,2024-02-20,2024-02-22,AIR,Frankfurt,Dubai,FRA,DXB,,BUSINESS,,,0,2100.00,CC-SALES,Middle East Expansion
+TRP-2024-007,Sarah Mueller,s.mueller@acmecorp.com,2024-02-15,2024-02-20,2024-02-22,HOTEL,,,,,,,Atlantis Dubai,Dubai,2,980.00,CC-SALES,Middle East Expansion
+TRP-2024-008,Thomas Klein,t.klein@acmecorp.com,2024-03-01,2024-03-05,2024-03-05,RAIL,Frankfurt,Amsterdam,,,400,,,,0,185.00,CC-MGMT,Partner Meeting
+TRP-2024-009,Aisha Johnson,a.johnson@acmecorp.com,2024-03-10,2024-03-15,2024-03-18,AIR,New York,London,JFK,LHR,,ECONOMY,,,0,780.00,CC-HR,Leadership Summit
+TRP-2024-009,Aisha Johnson,a.johnson@acmecorp.com,2024-03-10,2024-03-15,2024-03-18,HOTEL,,,,,,,Hilton London,London,3,890.00,CC-HR,Leadership Summit
+TRP-2024-010,Marcus Cole,m.cole@acmecorp.com,2024-03-20,2024-03-25,2024-03-28,AIR,Tokyo,Sydney,HND,SYD,,ECONOMY,,,0,1200.00,CC-SALES,APAC Follow-up
+TRP-2024-010,Marcus Cole,m.cole@acmecorp.com,2024-03-20,2024-03-25,2024-03-28,HOTEL,,,,,,,Four Seasons Sydney,Sydney,3,1400.00,CC-SALES,APAC Follow-up

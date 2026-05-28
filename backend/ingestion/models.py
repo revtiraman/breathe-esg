@@ -201,6 +201,14 @@ class ActivityRecord(models.Model):
     source_row = models.JSONField()
     source_row_number = models.IntegerField()
 
+    # Approximate CO2e using DEFRA 2023 baseline emission factors.
+    # Null = no factor available (unknown category or missing distance).
+    # Do NOT submit to auditors without validating against client-specific EFs.
+    co2e_kg = models.DecimalField(max_digits=18, decimal_places=4, null=True, blank=True)
+    co2e_factor = models.DecimalField(max_digits=12, decimal_places=6, null=True, blank=True)
+    co2e_factor_unit = models.CharField(max_length=50, blank=True)
+    co2e_factor_source = models.CharField(max_length=500, blank=True)
+
     # Was this record edited after ingestion?
     is_edited = models.BooleanField(default=False)
 

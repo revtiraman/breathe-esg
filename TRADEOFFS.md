@@ -1,14 +1,16 @@
-# Tradeoffs — Three Things I Deliberately Did Not Build
+# Tradeoffs — Three Things I Deliberately Built Differently
 
-## 1. CO2e calculation engine
+## 1. CO2e estimation (basic vs. production-grade EF engine)
 
-**What it would be:** An `EmissionFactor` table keyed by (category, year, region, source) holding values from DEFRA/BEIS, EPA, IPCC AR5/AR6, and the IEA electricity grid mix database. An `ActivityRecord` would have a computed `co2e_kg` field populated at approval time.
+**What was built:** `emission_factors.py` contains static DEFRA 2023 / UBA Germany emission factors for all supported categories. At ingest time, `compute_co2e()` calculates `co2e_kg` and stores the factor value, unit, and full citation string on each `ActivityRecord`. The UI surfaces these as indicative estimates with a warning label.
 
-**Why I didn't build it:** Emission factors are the most contentious part of any ESG report. The UK DEFRA BEIS EFs are updated every June. EU grid electricity EFs change quarterly and vary by bidding zone. Different auditors accept different factor versions — some require IPCC AR5, some AR6. Some clients have contractual renewable electricity certificates that zero out their Scope 2. Building an EF engine that handles all of these cases correctly, and that produces an audit-defensible calculation, is easily a two-week project on its own.
+**What a production implementation adds:** An `EmissionFactor` table keyed by `(category, year, region, source)` holding versioned values from DEFRA/BEIS, EPA, IPCC AR5/AR6, and the IEA grid electricity database. Key differences:
 
-The model is built for this: storing normalized activity quantities (kWh, liters, km, nights) is explicitly the right intermediate representation. You can apply any EF version at query time without touching stored data. Adding the EF engine later is additive, not a redesign.
+- **Versioning:** DEFRA BEIS EFs update every June. EU grid EFs vary by bidding zone and change quarterly. Clients may require a specific version (IPCC AR5 vs AR6 vs DEFRA 2023) written into their audit scope. The current static table hardcodes 2023 values.
+- **Recalculation:** When a new EF table ships, all approved records would need recalculation with a new `AuditLog` entry showing the before/after CO2e — not a re-ingestion.
+- **Contractual renewables:** Clients with PPAs or REGOs need their Scope 2 market-based figure zeroed out, which requires a per-facility override layer.
 
-**What a production implementation needs:** EF table with version history (factor_value, year, region, source, effective_from, effective_to), a `co2e_kg` field on `ActivityRecord`, recalculation on EF update with a new audit log entry, and clear UI showing which EF version was applied.
+**Why the static table is still correct:** Storing the emission factor and its source string on each record (rather than a FK to an EF table) ensures the calculation is always reproducible from the record alone, even after EF tables are updated. The gap is that you can't systematically recompute when a new factor vintage ships — you'd need to re-ingest or add a batch recalculation job.
 
 ---
 

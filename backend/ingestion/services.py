@@ -7,6 +7,7 @@ import logging
 from django.utils import timezone
 from .models import ActivityRecord, AuditLog, DataSource, IngestionBatch, ValidationIssue
 from .parsers import sap, utility, travel
+from .emission_factors import compute_co2e
 
 logger = logging.getLogger(__name__)
 
@@ -121,10 +122,21 @@ def ingest_file(data_source: DataSource, file_content: bytes, filename: str, use
                 source_row_number=rec_data.get("source_row_number"),
             )
 
+        # Compute approximate CO2e using DEFRA 2023 baseline factors
+        co2e_kg, co2e_factor, co2e_factor_unit, co2e_source = compute_co2e(
+            rec_data.get("category", ""),
+            rec_data.get("normalized_quantity", 0),
+            rec_data.get("extra_data", {}),
+        )
+
         record = ActivityRecord.objects.create(
             batch=batch,
             organization=data_source.organization,
             status=initial_status,
+            co2e_kg=co2e_kg,
+            co2e_factor=co2e_factor,
+            co2e_factor_unit=co2e_factor_unit or "",
+            co2e_factor_source=co2e_source or "",
             **{k: v for k, v in rec_data.items() if k not in ("source_row", "source_row_number")},
             source_row=rec_data.get("source_row", {}),
             source_row_number=rec_data.get("source_row_number", 0),

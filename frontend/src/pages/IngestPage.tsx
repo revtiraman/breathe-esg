@@ -1,5 +1,155 @@
 import { useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import api, { type DataSource, type IngestionBatch } from "../api";
+
+const SOURCE_HELP: Record<string, { cols: string; note: string }> = {
+  SAP: {
+    cols: "Werk · Materialkurztext · Buchungsdatum · Menge · Basismengeneinheit",
+    note: "Semicolon-delimited MB51/ME2N export. Supports DD.MM.YYYY dates and German decimal format.",
+  },
+  UTILITY: {
+    cols: "Meter Number · Billing Period Start · Billing Period End · Usage (kWh)",
+    note: "PG&E / National Grid / ComEd portal export. Billing periods need not align with calendar months.",
+  },
+  TRAVEL: {
+    cols: "Type · Travel Date · Origin Code · Destination Code · Distance (km) · Nights",
+    note: "Navan / Concur CSV export. Flight distances computed via Haversine if not supplied.",
+  },
+};
+
+function SourceCard({ source, selected, onSelect }: { source: DataSource; selected: boolean; onSelect: () => void }) {
+  const colors: Record<string, string> = { SAP: "var(--orange)", UTILITY: "var(--blue-700)", TRAVEL: "var(--purple-700)" };
+  return (
+    <div
+      onClick={onSelect}
+      style={{
+        padding: "14px 16px", borderRadius: 10, cursor: "pointer", marginBottom: 8,
+        border: `2px solid ${selected ? "var(--green-600)" : "var(--gray-300)"}`,
+        background: selected ? "var(--green-50)" : "#fff",
+        transition: "all .15s",
+      }}
+    >
+      <div className="flex justify-between items-center">
+        <strong style={{ fontSize: 13 }}>{source.name}</strong>
+        <span className={`badge badge-${source.source_type.toLowerCase()}`} style={{ fontSize: 10 }}>
+          {source.source_type}
+        </span>
+      </div>
+      {source.description && (
+        <div style={{ fontSize: 11, color: "var(--gray-500)", marginTop: 4 }}>{source.description}</div>
+      )}
+      {selected && SOURCE_HELP[source.source_type] && (
+        <div style={{ marginTop: 10, padding: "8px 10px", background: "var(--gray-100)", borderRadius: 6, fontSize: 11 }}>
+          <div style={{ color: colors[source.source_type], fontWeight: 600, marginBottom: 3 }}>Expected columns</div>
+          <div style={{ fontFamily: "ui-monospace,monospace", color: "var(--gray-700)", marginBottom: 4 }}>
+            {SOURCE_HELP[source.source_type].cols}
+          </div>
+          <div style={{ color: "var(--gray-500)" }}>{SOURCE_HELP[source.source_type].note}</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DropZone({ file, onFile }: { file: File | null; onFile: (f: File) => void }) {
+  const [dragging, setDragging] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault(); setDragging(false);
+    const f = e.dataTransfer.files[0];
+    if (f) onFile(f);
+  };
+
+  return (
+    <div
+      onDragOver={e => { e.preventDefault(); setDragging(true); }}
+      onDragLeave={() => setDragging(false)}
+      onDrop={handleDrop}
+      onClick={() => inputRef.current?.click()}
+      style={{
+        border: `2px dashed ${dragging ? "var(--green-600)" : file ? "var(--green-400)" : "var(--gray-300)"}`,
+        background: dragging ? "var(--green-50)" : file ? "var(--green-50)" : "var(--gray-50)",
+        borderRadius: 12, padding: "32px 20px", textAlign: "center",
+        cursor: "pointer", transition: "all .2s",
+      }}
+    >
+      <input ref={inputRef} type="file" accept=".csv,.txt" style={{ display: "none" }}
+        onChange={e => { const f = e.target.files?.[0]; if (f) onFile(f); }} />
+      {file ? (
+        <>
+          <div style={{ fontSize: 28, marginBottom: 6 }}>📄</div>
+          <div style={{ fontWeight: 700, fontSize: 14, color: "var(--green-800)" }}>{file.name}</div>
+          <div style={{ fontSize: 11, color: "var(--gray-500)", marginTop: 3 }}>
+            {(file.size / 1024).toFixed(1)} KB — click to replace
+          </div>
+        </>
+      ) : (
+        <>
+          <div style={{ fontSize: 28, marginBottom: 8 }}>⬆</div>
+          <div style={{ fontWeight: 600, fontSize: 14, color: "var(--gray-700)" }}>Drop CSV here or click to browse</div>
+          <div style={{ fontSize: 11, color: "var(--gray-500)", marginTop: 4 }}>Accepts .csv and .txt files</div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function ResultCard({ batch, onReset }: { batch: IngestionBatch; onReset: () => void }) {
+  const ok = batch.status === "completed";
+  const hasIssues = batch.issues.length > 0;
+
+  return (
+    <div className="card">
+      <div className="flex justify-between items-center mb-3">
+        <div style={{ fontWeight: 700, fontSize: 15 }}>Ingestion Complete</div>
+        <span className={`badge ${ok ? "badge-approved" : "badge-warning"}`}>
+          {batch.status.replace(/_/g, " ")}
+        </span>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 16 }}>
+        {[
+          { label: "Total Rows", value: batch.row_count, color: "var(--gray-700)" },
+          { label: "Accepted", value: batch.accepted_count, color: "var(--green-800)" },
+          { label: "Rejected", value: batch.rejected_count, color: batch.rejected_count > 0 ? "var(--red)" : "var(--gray-500)" },
+          { label: "Warnings", value: batch.warning_count, color: batch.warning_count > 0 ? "var(--amber)" : "var(--gray-500)" },
+        ].map(({ label, value, color }) => (
+          <div key={label} style={{
+            background: "var(--gray-100)", padding: "14px 16px", borderRadius: 8, textAlign: "center",
+          }}>
+            <div style={{ fontSize: 26, fontWeight: 800, color }}>{value}</div>
+            <div style={{ fontSize: 11, color: "var(--gray-500)", fontWeight: 500 }}>{label}</div>
+          </div>
+        ))}
+      </div>
+
+      {hasIssues && (
+        <div style={{ marginBottom: 14 }}>
+          <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6, color: "var(--gray-700)" }}>
+            Validation Issues ({batch.issues.length})
+          </div>
+          <div style={{ maxHeight: 180, overflowY: "auto", display: "flex", flexDirection: "column", gap: 4 }}>
+            {batch.issues.map(issue => (
+              <div key={issue.id} className={`alert alert-${issue.severity}`} style={{ marginBottom: 0, fontSize: 11 }}>
+                <strong>{issue.code}</strong>
+                {issue.source_row_number && <span style={{ marginLeft: 4 }}>(row {issue.source_row_number})</span>}
+                : {issue.message}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="flex gap-2">
+        <Link to="/review?status=pending_review" style={{ flex: 1 }}>
+          <button className="btn-primary w-full">Go to Review Queue →</button>
+        </Link>
+        <button className="btn-secondary" onClick={onReset}>Upload Another</button>
+      </div>
+    </div>
+  );
+}
 
 export default function IngestPage() {
   const [sources, setSources] = useState<DataSource[]>([]);
@@ -8,9 +158,7 @@ export default function IngestPage() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<IngestionBatch | null>(null);
   const [error, setError] = useState("");
-  const fileRef = useRef<HTMLInputElement>(null);
 
-  // New source form
   const [showNewSource, setShowNewSource] = useState(false);
   const [newSourceType, setNewSourceType] = useState("SAP");
   const [newSourceName, setNewSourceName] = useState("");
@@ -27,20 +175,17 @@ export default function IngestPage() {
   const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!file || !selectedSource) return;
-    setLoading(true);
-    setError("");
-    setResult(null);
+    setLoading(true); setError(""); setResult(null);
     const form = new FormData();
     form.append("source_id", selectedSource);
     form.append("file", file);
     try {
       const r = await api.post<IngestionBatch>("/upload/", form);
       setResult(r.data);
-      if (fileRef.current) fileRef.current.value = "";
       setFile(null);
     } catch (err: unknown) {
-      const axiosErr = err as { response?: { data?: { detail?: string } } };
-      setError(axiosErr.response?.data?.detail ?? "Upload failed");
+      const ax = err as { response?: { data?: { detail?: string } } };
+      setError(ax.response?.data?.detail ?? "Upload failed. Check the file format and try again.");
     } finally {
       setLoading(false);
     }
@@ -51,158 +196,137 @@ export default function IngestPage() {
     setCreatingSource(true);
     try {
       const r = await api.post<DataSource>("/sources/", {
-        source_type: newSourceType,
-        name: newSourceName,
-        description: newSourceDesc,
+        source_type: newSourceType, name: newSourceName, description: newSourceDesc,
       });
       setSources(prev => [...prev, r.data]);
       setSelectedSource(r.data.id);
       setShowNewSource(false);
-      setNewSourceName("");
-      setNewSourceDesc("");
+      setNewSourceName(""); setNewSourceDesc("");
     } finally {
       setCreatingSource(false);
     }
   };
 
-  const selected = sources.find(s => s.id === selectedSource);
-
-  const SOURCE_HELP: Record<string, string> = {
-    SAP: "Upload a SAP MB51/ME2N semicolon-delimited CSV export. Expected columns: Werk, Materialkurztext, Buchungsdatum, Menge, Basismengeneinheit.",
-    UTILITY: "Upload a utility portal CSV (PG&E / National Grid style). Expected columns: Meter Number, Billing Period Start, Billing Period End, Usage (kWh).",
-    TRAVEL: "Upload a Navan or Concur trip export CSV. Expected columns: Type, Travel Date, Origin Code, Destination Code, Distance (km), Nights.",
-  };
-
   return (
     <div>
       <div className="page-header">
-        <h1>Ingest Data</h1>
-        <p>Upload CSV exports from SAP, utility portals, or corporate travel platforms</p>
+        <div>
+          <h1>Ingest Data</h1>
+          <p>Upload CSV exports from SAP, utility portals, or corporate travel platforms for GHG Protocol classification</p>
+        </div>
       </div>
 
       <div className="two-col">
+        {/* Left — source selection + upload */}
         <div>
-          <div className="card" style={{ marginBottom: 16 }}>
-            <h3 style={{ marginBottom: 16, fontSize: 15, fontWeight: 600 }}>Upload File</h3>
+          {result ? (
+            <ResultCard batch={result} onReset={() => setResult(null)} />
+          ) : (
+            <div className="card">
+              <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 12 }}>1 · Select data source</div>
 
-            {error && <div className="alert alert-error">{error}</div>}
+              {sources.map(s => (
+                <SourceCard key={s.id} source={s} selected={s.id === selectedSource} onSelect={() => setSelectedSource(s.id)} />
+              ))}
 
-            <form onSubmit={handleUpload}>
-              <div className="form-group">
-                <label>Data Source</label>
-                <div style={{ display: "flex", gap: 8 }}>
-                  <select value={selectedSource} onChange={e => setSelectedSource(e.target.value)} style={{ flex: 1 }}>
-                    {sources.map(s => (
-                      <option key={s.id} value={s.id}>{s.name} ({s.source_type})</option>
-                    ))}
-                  </select>
-                  <button type="button" className="btn-secondary btn-sm" onClick={() => setShowNewSource(!showNewSource)}>
-                    + New
-                  </button>
-                </div>
-              </div>
+              <button
+                type="button"
+                className="btn-ghost btn-sm"
+                style={{ marginTop: 4, width: "100%" }}
+                onClick={() => setShowNewSource(!showNewSource)}
+              >
+                {showNewSource ? "— Cancel" : "+ Add new data source"}
+              </button>
 
-              {selected && (
-                <div className="alert alert-warning" style={{ fontSize: 12 }}>
-                  <strong>{selected.source_type} format:</strong> {SOURCE_HELP[selected.source_type]}
-                </div>
+              {showNewSource && (
+                <form onSubmit={handleCreateSource} style={{ marginTop: 12, padding: 14, background: "var(--gray-50)", borderRadius: 8 }}>
+                  <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 10 }}>New Data Source</div>
+                  <div className="form-group">
+                    <label>Type</label>
+                    <select value={newSourceType} onChange={e => setNewSourceType(e.target.value)}>
+                      <option value="SAP">SAP (Fuel & Procurement)</option>
+                      <option value="UTILITY">Utility Portal (Electricity)</option>
+                      <option value="TRAVEL">Corporate Travel (Concur/Navan)</option>
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label>Name</label>
+                    <input value={newSourceName} onChange={e => setNewSourceName(e.target.value)}
+                      placeholder="e.g. SAP Production Q1 2024" required />
+                  </div>
+                  <div className="form-group">
+                    <label>Description <span className="text-muted">(optional)</span></label>
+                    <textarea value={newSourceDesc} onChange={e => setNewSourceDesc(e.target.value)} rows={2} />
+                  </div>
+                  <div className="flex gap-2">
+                    <button className="btn-primary btn-sm" disabled={creatingSource}>
+                      {creatingSource ? "Creating…" : "Create Source"}
+                    </button>
+                    <button type="button" className="btn-secondary btn-sm" onClick={() => setShowNewSource(false)}>Cancel</button>
+                  </div>
+                </form>
               )}
 
-              <div className="form-group">
-                <label>CSV File</label>
-                <input
-                  type="file"
-                  accept=".csv,.txt"
-                  ref={fileRef}
-                  onChange={e => setFile(e.target.files?.[0] ?? null)}
-                  required
-                />
-              </div>
+              <div style={{ borderTop: "1px solid var(--gray-300)", margin: "20px 0" }} />
 
-              <button className="btn-primary" disabled={loading || !file || !selectedSource} style={{ width: "100%" }}>
-                {loading ? "Processing…" : "Upload & Ingest"}
-              </button>
-            </form>
-          </div>
+              <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 12 }}>2 · Drop your CSV file</div>
 
-          {showNewSource && (
-            <div className="card">
-              <h3 style={{ marginBottom: 16, fontSize: 15, fontWeight: 600 }}>New Data Source</h3>
-              <form onSubmit={handleCreateSource}>
-                <div className="form-group">
-                  <label>Type</label>
-                  <select value={newSourceType} onChange={e => setNewSourceType(e.target.value)}>
-                    <option value="SAP">SAP (Fuel & Procurement)</option>
-                    <option value="UTILITY">Utility Portal (Electricity)</option>
-                    <option value="TRAVEL">Corporate Travel (Concur/Navan)</option>
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label>Name</label>
-                  <input value={newSourceName} onChange={e => setNewSourceName(e.target.value)} placeholder="e.g. SAP Production Export" required />
-                </div>
-                <div className="form-group">
-                  <label>Description (optional)</label>
-                  <textarea value={newSourceDesc} onChange={e => setNewSourceDesc(e.target.value)} rows={2} />
-                </div>
-                <div style={{ display: "flex", gap: 8 }}>
-                  <button className="btn-primary" disabled={creatingSource}>{creatingSource ? "Creating…" : "Create"}</button>
-                  <button type="button" className="btn-secondary" onClick={() => setShowNewSource(false)}>Cancel</button>
-                </div>
+              {error && <div className="alert alert-error" style={{ marginBottom: 12 }}>{error}</div>}
+
+              <form onSubmit={handleUpload}>
+                <DropZone file={file} onFile={setFile} />
+
+                <button
+                  className="btn-primary w-full"
+                  disabled={loading || !file || !selectedSource}
+                  style={{ marginTop: 14 }}
+                >
+                  {loading ? (
+                    <span className="flex items-center gap-2" style={{ justifyContent: "center" }}>
+                      <span className="spinner" style={{ width: 16, height: 16, borderWidth: 2 }} />
+                      Processing…
+                    </span>
+                  ) : "Upload & Ingest →"}
+                </button>
               </form>
             </div>
           )}
         </div>
 
+        {/* Right — configured sources + format guide */}
         <div>
-          {result ? (
-            <div className="card">
-              <h3 style={{ marginBottom: 16, fontSize: 15, fontWeight: 600 }}>
-                Ingestion Result
-                <span className={`badge badge-${result.status === "completed" ? "approved" : "warning"}`} style={{ marginLeft: 8 }}>
-                  {result.status.replace(/_/g, " ")}
-                </span>
-              </h3>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
-                {[
-                  { label: "Total Rows", value: result.row_count },
-                  { label: "Accepted", value: result.accepted_count, color: "var(--green)" },
-                  { label: "Rejected", value: result.rejected_count, color: result.rejected_count > 0 ? "var(--red)" : undefined },
-                  { label: "Warnings", value: result.warning_count, color: result.warning_count > 0 ? "var(--orange)" : undefined },
-                ].map(({ label, value, color }) => (
-                  <div key={label} style={{ background: "var(--gray-light)", padding: "12px", borderRadius: 6, textAlign: "center" }}>
-                    <div style={{ fontSize: 24, fontWeight: 700, color }}>{value}</div>
-                    <div style={{ fontSize: 12, color: "var(--text-muted)" }}>{label}</div>
-                  </div>
-                ))}
+          <div className="card mb-4">
+            <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 12 }}>Configured Sources</div>
+            {sources.length === 0 ? (
+              <div className="text-muted text-sm">No sources yet — create one on the left.</div>
+            ) : sources.map(s => (
+              <div key={s.id} style={{ padding: "10px 0", borderBottom: "1px solid var(--gray-300)" }}>
+                <div className="flex justify-between items-center">
+                  <strong style={{ fontSize: 13 }}>{s.name}</strong>
+                  <span className={`badge badge-${s.source_type.toLowerCase()}`} style={{ fontSize: 10 }}>{s.source_type}</span>
+                </div>
+                {s.description && <div style={{ fontSize: 11, color: "var(--gray-500)", marginTop: 3 }}>{s.description}</div>}
               </div>
-              {result.issues.length > 0 && (
-                <div>
-                  <h4 style={{ marginBottom: 8, fontSize: 13 }}>Issues</h4>
-                  <div style={{ maxHeight: 200, overflow: "auto" }}>
-                    {result.issues.map(issue => (
-                      <div key={issue.id} className={`alert alert-${issue.severity}`} style={{ marginBottom: 6, fontSize: 12 }}>
-                        <strong>{issue.code}</strong> (row {issue.source_row_number}): {issue.message}
-                      </div>
-                    ))}
-                  </div>
+            ))}
+          </div>
+
+          <div className="card">
+            <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 12 }}>Format Reference</div>
+            {Object.entries(SOURCE_HELP).map(([type, info]) => (
+              <div key={type} style={{ marginBottom: 14, paddingBottom: 14, borderBottom: "1px solid var(--gray-100)" }}>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className={`badge badge-${type.toLowerCase()}`} style={{ fontSize: 10 }}>{type}</span>
                 </div>
-              )}
-            </div>
-          ) : (
-            <div className="card">
-              <h3 style={{ marginBottom: 12, fontSize: 15, fontWeight: 600 }}>Configured Sources</h3>
-              {sources.map(s => (
-                <div key={s.id} style={{ padding: "10px 0", borderBottom: "1px solid var(--border)" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <strong style={{ fontSize: 13 }}>{s.name}</strong>
-                    <span className={`badge badge-${s.source_type.toLowerCase()}`}>{s.source_type}</span>
-                  </div>
-                  {s.description && <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 4 }}>{s.description}</div>}
+                <div style={{ fontSize: 11, fontFamily: "ui-monospace,monospace", color: "var(--gray-700)", marginBottom: 4 }}>
+                  {info.cols}
                 </div>
-              ))}
+                <div style={{ fontSize: 11, color: "var(--gray-500)" }}>{info.note}</div>
+              </div>
+            ))}
+            <div className="alert alert-warning" style={{ fontSize: 11, marginBottom: 0 }}>
+              Duplicate files are detected via SHA-256 hash — re-uploading the same file will be rejected.
             </div>
-          )}
+          </div>
         </div>
       </div>
     </div>

@@ -2,32 +2,29 @@ import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import api, { type ActivityRecord, type PaginatedResponse } from "../api";
 
-function statusBadge(status: string) {
+const fmtDate = (s: string) =>
+  new Date(s).toLocaleDateString("en-GB", { day: "2-digit", month: "short" });
+const fmtCO2e = (v: string | null) => {
+  if (!v) return <span className="text-muted text-xs">—</span>;
+  const n = parseFloat(v);
+  return <span className="co2e-value">{n >= 1000 ? `${(n/1000).toFixed(2)} t` : `${n.toFixed(1)} kg`}</span>;
+};
+
+function StatusBadge({ s }: { s: string }) {
   const map: Record<string, string> = {
-    pending_review: "badge-pending",
-    approved: "badge-approved",
-    rejected: "badge-rejected",
-    flagged_suspicious: "badge-flagged",
+    pending_review: "badge-pending", approved: "badge-approved",
+    rejected: "badge-rejected", flagged_suspicious: "badge-flagged",
   };
   const labels: Record<string, string> = {
-    pending_review: "Pending",
-    approved: "Approved",
-    rejected: "Rejected",
-    flagged_suspicious: "Flagged",
+    pending_review: "Pending", approved: "Approved",
+    rejected: "Rejected", flagged_suspicious: "Flagged",
   };
-  return <span className={`badge ${map[status] ?? ""}`}>{labels[status] ?? status}</span>;
+  return <span className={`badge ${map[s] ?? ""}`}>{labels[s] ?? s}</span>;
 }
 
-function scopeBadge(scope: number) {
-  return <span className={`badge badge-scope${scope}`}>Scope {scope}</span>;
-}
-
-function sourceBadge(sourceType: string) {
-  return <span className={`badge badge-${sourceType.toLowerCase()}`}>{sourceType}</span>;
-}
-
-function fmtDate(s: string) {
-  return new Date(s).toLocaleDateString("en-GB", { day: "2-digit", month: "short" });
+function Toast({ message, type, onClose }: { message: string; type: "success"|"error"; onClose: () => void }) {
+  useEffect(() => { const t = setTimeout(onClose, 3000); return () => clearTimeout(t); }, [onClose]);
+  return <div className={`toast toast-${type}`} onClick={onClose}>{message}</div>;
 }
 
 export default function ReviewPage() {
@@ -38,7 +35,7 @@ export default function ReviewPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkStatus, setBulkStatus] = useState("approved");
   const [bulkLoading, setBulkLoading] = useState(false);
-  const [message, setMessage] = useState("");
+  const [toast, setToast] = useState<{ msg: string; type: "success"|"error" } | null>(null);
 
   const page = parseInt(searchParams.get("page") ?? "1");
   const status = searchParams.get("status") ?? "";
@@ -68,51 +65,50 @@ export default function ReviewPage() {
     setSelected(new Set());
   };
 
-  const toggleSelect = (id: string) => {
-    setSelected(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
-  };
-
-  const selectAll = () => {
-    if (selected.size === records.length) {
-      setSelected(new Set());
-    } else {
-      setSelected(new Set(records.map(r => r.id)));
-    }
-  };
+  const toggleSelect = (id: string) => setSelected(prev => {
+    const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n;
+  });
+  const allSelected = selected.size === records.length && records.length > 0;
+  const selectAll = () => setSelected(allSelected ? new Set() : new Set(records.map(r => r.id)));
 
   const handleBulkAction = async () => {
-    if (selected.size === 0) return;
+    if (!selected.size) return;
     setBulkLoading(true);
-    setMessage("");
     try {
-      const r = await api.post("/records/bulk_review/", {
-        ids: Array.from(selected),
-        status: bulkStatus,
-      });
-      setMessage(`Updated ${r.data.updated} records`);
+      const r = await api.post("/records/bulk_review/", { ids: Array.from(selected), status: bulkStatus });
+      setToast({ msg: `Updated ${r.data.updated} records`, type: "success" });
       setSelected(new Set());
       fetchRecords();
+    } catch {
+      setToast({ msg: "Bulk update failed", type: "error" });
     } finally {
       setBulkLoading(false);
     }
   };
 
   const totalPages = Math.ceil(count / 50);
+  const statusLabel = status ? status.replace(/_/g, " ") : "all";
 
   return (
     <div>
-      <div className="page-header">
-        <h1>Review Queue</h1>
-        <p>{count} records{status ? ` — ${status.replace(/_/g, " ")}` : ""}</p>
+      {toast && <Toast message={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
+
+      <div className="page-header flex justify-between items-center">
+        <div>
+          <h1>Review Queue</h1>
+          <p>
+            {count} {statusLabel} records
+            {selected.size > 0 && <span style={{ marginLeft: 8, color: "var(--green-800)", fontWeight: 600 }}>· {selected.size} selected</span>}
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <a href={`/api/records/export/?status=${status || "approved"}`} download>
+            <button className="btn-secondary btn-sm">↓ Export CSV</button>
+          </a>
+        </div>
       </div>
 
-      {message && <div className="alert alert-success">{message}</div>}
-
-      <div className="card" style={{ marginBottom: 16 }}>
+      <div className="card" style={{ marginBottom: 12 }}>
         <div className="filter-bar">
           <select value={status} onChange={e => setFilter("status", e.target.value)}>
             <option value="">All Statuses</option>
@@ -139,79 +135,108 @@ export default function ReviewPage() {
             onChange={e => setFilter("search", e.target.value)}
             style={{ minWidth: 200 }}
           />
+          <div className="spacer" />
+          {(status || scope || sourceType || search) && (
+            <button className="btn-ghost btn-sm" onClick={() => { setSearchParams({}); setSelected(new Set()); }}>
+              Clear filters
+            </button>
+          )}
         </div>
 
         {selected.size > 0 && (
-          <div style={{ display: "flex", gap: 8, alignItems: "center", padding: "8px 0", borderTop: "1px solid var(--border)" }}>
-            <span style={{ fontSize: 13, color: "var(--text-muted)" }}>{selected.size} selected</span>
-            <select value={bulkStatus} onChange={e => setBulkStatus(e.target.value)} style={{ width: "auto", minWidth: 140 }}>
-              <option value="approved">Approve</option>
-              <option value="rejected">Reject</option>
-              <option value="flagged_suspicious">Flag</option>
+          <div style={{
+            display: "flex", gap: 8, alignItems: "center",
+            padding: "10px 14px", background: "var(--green-50)",
+            border: "1px solid var(--green-100)", borderRadius: 8, marginTop: 4,
+          }}>
+            <span style={{ fontSize: 13, color: "var(--green-800)", fontWeight: 600 }}>{selected.size} selected</span>
+            <select value={bulkStatus} onChange={e => setBulkStatus(e.target.value)} style={{ width: "auto", minWidth: 150 }}>
+              <option value="approved">Mark as Approved</option>
+              <option value="rejected">Mark as Rejected</option>
+              <option value="flagged_suspicious">Mark as Flagged</option>
             </select>
             <button className="btn-primary btn-sm" onClick={handleBulkAction} disabled={bulkLoading}>
-              {bulkLoading ? "Applying…" : "Apply to selected"}
+              {bulkLoading ? "Applying…" : "Apply"}
             </button>
-            <button className="btn-secondary btn-sm" onClick={() => setSelected(new Set())}>Clear</button>
+            <button className="btn-ghost btn-sm" onClick={() => setSelected(new Set())}>Clear selection</button>
           </div>
         )}
       </div>
 
       <div className="card">
         {loading ? (
-          <div style={{ padding: 32, textAlign: "center", color: "var(--text-muted)" }}>Loading…</div>
+          <div style={{ padding: 40, textAlign: "center" }}>
+            <div className="spinner" style={{ margin: "0 auto 10px" }} />
+            <div className="text-muted">Loading records…</div>
+          </div>
         ) : (
-          <div className="overflow-auto">
+          <div className="table-wrap">
             <table>
               <thead>
                 <tr>
-                  <th><input type="checkbox" checked={selected.size === records.length && records.length > 0} onChange={selectAll} /></th>
+                  <th style={{ width: 36 }}>
+                    <input type="checkbox" checked={allSelected} onChange={selectAll} />
+                  </th>
                   <th>Status</th>
                   <th>Scope</th>
                   <th>Category</th>
                   <th>Facility</th>
                   <th>Period</th>
                   <th>Quantity</th>
+                  <th>~CO₂e</th>
                   <th>Source</th>
-                  <th>Issues</th>
+                  <th style={{ width: 36 }}>!</th>
                   <th></th>
                 </tr>
               </thead>
               <tbody>
                 {records.map(r => (
-                  <tr key={r.id}>
+                  <tr key={r.id} className={r.status === "flagged_suspicious" ? "tr-flagged" : ""}>
                     <td><input type="checkbox" checked={selected.has(r.id)} onChange={() => toggleSelect(r.id)} /></td>
-                    <td>{statusBadge(r.status)}</td>
-                    <td>{scopeBadge(r.scope)}</td>
-                    <td style={{ maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      <span title={r.category_display} style={{ fontSize: 12 }}>{r.category_display}</span>
+                    <td><StatusBadge s={r.status} /></td>
+                    <td>
+                      <span className={`badge badge-scope${r.scope}`} style={{ fontSize: 10 }}>S{r.scope}</span>
                     </td>
-                    <td style={{ maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      <span title={r.facility_name || r.facility_code}>{r.facility_name || r.facility_code}</span>
+                    <td className="truncate" style={{ maxWidth: 140 }}>
+                      <span title={r.category_display} className="text-sm">{r.category_display}</span>
                     </td>
-                    <td style={{ fontSize: 12, color: "var(--text-muted)", whiteSpace: "nowrap" }}>
+                    <td className="truncate" style={{ maxWidth: 160 }}>
+                      <span title={r.facility_name || r.facility_code} className="text-sm">
+                        {r.facility_name || r.facility_code || <span className="text-muted">—</span>}
+                      </span>
+                    </td>
+                    <td className="text-muted text-xs" style={{ whiteSpace: "nowrap" }}>
                       {fmtDate(r.period_start)}
-                      {r.period_start !== r.period_end && <> – {fmtDate(r.period_end)}</>}
+                      {r.period_start !== r.period_end && <> → {fmtDate(r.period_end)}</>}
                     </td>
                     <td style={{ whiteSpace: "nowrap" }}>
-                      <strong>{parseFloat(r.normalized_quantity).toLocaleString("en", { maximumFractionDigits: 1 })}</strong>
-                      <span style={{ color: "var(--text-muted)", marginLeft: 4, fontSize: 12 }}>{r.normalized_unit}</span>
+                      <span style={{ fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>
+                        {parseFloat(r.normalized_quantity).toLocaleString("en", { maximumFractionDigits: 1 })}
+                      </span>
+                      <span className="text-muted text-xs" style={{ marginLeft: 4 }}>{r.normalized_unit}</span>
                     </td>
-                    <td>{sourceBadge(r.source_type)}</td>
+                    <td>{fmtCO2e(r.co2e_kg)}</td>
+                    <td><span className={`badge badge-${r.source_type.toLowerCase()}`} style={{ fontSize: 10 }}>{r.source_type}</span></td>
                     <td>
                       {r.issue_count > 0 && (
-                        <span style={{ color: "var(--orange)", fontSize: 12 }}>⚠ {r.issue_count}</span>
+                        <span title={`${r.issue_count} issues`} style={{ color: "var(--amber)", fontWeight: 700, fontSize: 13 }}>!</span>
                       )}
                     </td>
                     <td>
                       <Link to={`/review/${r.id}`}>
-                        <button className="btn-secondary btn-sm">Review</button>
+                        <button className="btn-secondary btn-xs">Review</button>
                       </Link>
                     </td>
                   </tr>
                 ))}
                 {records.length === 0 && (
-                  <tr><td colSpan={10} style={{ textAlign: "center", padding: 32, color: "var(--text-muted)" }}>No records found</td></tr>
+                  <tr>
+                    <td colSpan={11} style={{ textAlign: "center", padding: 48, color: "var(--gray-500)" }}>
+                      <div style={{ fontSize: 32, marginBottom: 8 }}>✓</div>
+                      <div style={{ fontWeight: 600 }}>No records</div>
+                      <div className="text-sm mt-1">Try adjusting your filters</div>
+                    </td>
+                  </tr>
                 )}
               </tbody>
             </table>
@@ -220,9 +245,11 @@ export default function ReviewPage() {
 
         {totalPages > 1 && (
           <div className="pagination">
-            <span>{(page - 1) * 50 + 1}–{Math.min(page * 50, count)} of {count}</span>
-            <button className="btn-secondary btn-sm" disabled={page <= 1} onClick={() => setFilter("page", String(page - 1))}>← Prev</button>
-            <button className="btn-secondary btn-sm" disabled={page >= totalPages} onClick={() => setFilter("page", String(page + 1))}>Next →</button>
+            <span>{(page-1)*50+1}–{Math.min(page*50, count)} of {count}</span>
+            <button className="btn-secondary btn-sm" disabled={page <= 1}
+              onClick={() => setFilter("page", String(page-1))}>← Prev</button>
+            <button className="btn-secondary btn-sm" disabled={page >= totalPages}
+              onClick={() => setFilter("page", String(page+1))}>Next →</button>
           </div>
         )}
       </div>

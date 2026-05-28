@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: breathe-esg
+    env: python
+    region: singapore
+    plan: free
+    buildCommand: >
+      cd frontend && npm install && npm run build &&
+      cd ../backend && pip install -r requirements.txt &&
+      python manage.py collectstatic --noinput &&
+      python manage.py migrate &&
+      python manage.py seed_demo
+    startCommand: cd backend && gunicorn breathe.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --timeout 120
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DEBUG
+        value: "False"
+      - key: PYTHON_VERSION
+        value: "3.11.0"
+      - key: NODE_VERSION
+        value: "20.11.0"

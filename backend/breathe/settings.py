@@ -76,6 +76,10 @@ react_build = BASE_DIR.parent / "frontend" / "dist"
 if react_build.exists():
     STATICFILES_DIRS.append(react_build)
 
+# Serve React dist files at root (e.g. /assets/index.js) via WhiteNoise
+# so Vite's asset references work without a /static/ prefix.
+WHITENOISE_ROOT = BASE_DIR.parent / "frontend" / "dist"
+
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 

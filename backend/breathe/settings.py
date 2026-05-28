@@ -101,7 +101,7 @@ CORS_ALLOW_CREDENTIALS = True
 
 CSRF_TRUSTED_ORIGINS = config(
     "CSRF_TRUSTED_ORIGINS",
-    default="http://localhost:5173,http://localhost:8001",
+    default="http://localhost:5173,http://localhost:8001,https://*.loca.lt,https://*.up.railway.app",
 ).split(",")
 
 DATA_UPLOAD_MAX_MEMORY_SIZE = 20 * 1024 * 1024

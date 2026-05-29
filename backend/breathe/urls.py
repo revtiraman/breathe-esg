@@ -6,7 +6,7 @@ from django.views.generic import TemplateView
 from django.http import HttpResponse
 import os
 
-def index_view(request):
+def index_view(request, **kwargs):
     """Serve React app for all non-API routes."""
     dist_index = os.path.join(settings.BASE_DIR.parent, "frontend", "dist", "index.html")
     if os.path.exists(dist_index):
